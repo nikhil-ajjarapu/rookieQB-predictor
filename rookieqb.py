@@ -1,5 +1,4 @@
 #predict best rookie qb performance
-#TODO: Add NFL o-line data
 
 import numpy as np
 from sklearn import svm
@@ -94,9 +93,10 @@ def processCollegeDefense(qbr_array, year):
     return np.delete(defense_stats, (0), axis=0)
 
 #read ANY/A stats
-def processANYA(qbr_array, year):
+def processANYAandOline(qbr_array, year):
     anya = np.genfromtxt('/users/nikhil/Documents/Football/nfl_anya/anya_' + str(year) + ".csv", delimiter=',', dtype=str, encoding=None, usecols=np.arange(0,29))
     anya_stats = np.array([0])
+    oline_stats = np.array([0,0])
     for row in qbr_array:
         name = row[0]
         index = np.where(anya == name)
@@ -104,18 +104,35 @@ def processANYA(qbr_array, year):
             anya_stats = np.vstack((anya_stats, -1))
             continue
         anya_stats = np.vstack((anya_stats, float(anya[index[0][0]][-3])))
-    return np.delete(anya_stats, (0), axis=0)
+        team = anya[index[0]][0][2]
+        oline_stat = processNFLOline(team)
+        oline_stats = np.vstack((oline_stats, oline_stat))
+    return np.delete(anya_stats, (0), axis=0), np.delete(oline_stats, (0), axis=0)
+
+#read NFL oline stats team by team - functions differently from other functions
+def processNFLOline(team):
+    oline_nfl = np.genfromtxt('/users/nikhil/Documents/Football/nfl_oline/nfloline' + str(year) + ".csv", delimiter=',', dtype=str, encoding=None)
+    if "NWE" in team:
+        team = "NE"
+    if "KAN" in team:
+        team = "KC"
+    index = np.where(oline_nfl == team)
+    if len(index) > 1:
+        index = max(tuple(map(tuple, index)))
+    return [float(x.strip("%")) for x in oline_nfl[index[1]][-2:]]
 
 #generate X and y matrices
-def createMasterArrays(qbr, oline, defense, anya):
-    X = np.array([0] * 18)
+def createMasterArrays(qbr, college_oline,nfl_oline, defense, anya):
+    X = np.array([0] * 20)
     y = np.array([0])
+    oline_ind = 0
     for ind,row in enumerate(anya):
         if row[0] == -1:
             continue
         else:
-            X = np.vstack((X, np.append(oline[ind], np.append(qbr[ind][2:], defense[ind]))))
+            X = np.vstack((X, np.append(college_oline[ind], np.append(nfl_oline[oline_ind], np.append(qbr[ind][2:], defense[ind])))))
             y = np.vstack((y,row[0]))
+            oline_ind += 1
     return np.delete(X, (0), axis=0),np.delete(y, (0), axis=0)
 
 #constants
@@ -127,13 +144,13 @@ y = np.array([])
 for year in [2014,2015,2016,2017]:
     #preprocess input data
     qbr_master = processCollegeQBR(year)
-    oline_master = processCollegeOline(qbr_master, year)
+    college_oline_master = processCollegeOline(qbr_master, year)
     defense_master = processCollegeDefense(qbr_master, year)
     #preprocess output data
-    anya_master = processANYA(qbr_master, year + 1)
+    anya_master,nfl_oline_master  = processANYAandOline(qbr_master, year + 1)
 
     #create one big input and output array
-    temp_X,temp_y = createMasterArrays(qbr_master, oline_master, defense_master, anya_master)
+    temp_X,temp_y = createMasterArrays(qbr_master, college_oline_master, nfl_oline_master, defense_master, anya_master)
     if X.shape[0] == 0:
         X = temp_X
         y = temp_y
