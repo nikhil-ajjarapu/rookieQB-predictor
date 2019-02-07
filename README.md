@@ -1,6 +1,6 @@
 # rookieQB-predictor
 
-Technical Description: 
+__Technical Description__: 
 
 Uses machine learning to estimate rookie QB performance. 
 
